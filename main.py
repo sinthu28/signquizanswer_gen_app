@@ -1,34 +1,91 @@
+from data_preprocessing.load.VideoLoader import VideoLoader
+from data_preprocessing.normalization.FrameNormaliser import FrameNormaliser
+from data_preprocessing.parallel_processing.VideoPreprocessor import VideoPreprocessor
+from data_preprocessing.augmentation.DataAugmentation import DataAugmentation
+from data_preprocessing.feature_extraction.OpticalFlowCalculator import OpticalFlowCalculator
+from data_preprocessing.sequence_alignment.SequenceAligner import SequenceAligner
+from data_preprocessing.utils.DataSplitter import DataSplitter
+from models.CNN import CNNLSTMModelBuilder
+from models.Transformers import TransformerBlock
+
 import os
-from data_preprocessing.pipeline.full_preprocessing_pipeline import full_preprocessing_pipeline
-from data_preprocessing.load.load_video_frames import load_video_frames
-from data_preprocessing.normalization.normalize_frames import normalize_frames
-from data_preprocessing.utils.helper_functions import save_preprocessed_data
+import numpy as np
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def main():
-    # Specify the directory containing video data
-    video_dir = './videos/'
-    
-    # Check if the directory exists
-    if not os.path.exists(video_dir):
-        raise FileNotFoundError(f"The directory {video_dir} does not exist.")
-    
-    # Specify the output directory for saving preprocessed data
-    output_dir = './preprocessed_data/'
-    
-    # Run the full preprocessing pipeline
-    train_data, test_data = full_preprocessing_pipeline(
-        video_dir=video_dir,
-        load_video_frames=load_video_frames,
-        normalize_frames=normalize_frames,
-        test_size=0.2,
-        apply_optical_flow=True  # Set this to False if you don't need optical flow
-    )
-    
-    # Save the preprocessed training and testing data
-    save_preprocessed_data(train_data, output_dir, prefix='train')
-    save_preprocessed_data(test_data, output_dir, prefix='test')
-    
-    print("Preprocessing complete. Data saved to", output_dir)
+    video_dir = 'path/to/video_directory'
+    test_size = 0.2
+    use_gpu = True
+    max_workers = 4
+    use_process_pool = False
+    apply_optical_flow = True
+
+    try:
+        # Initialize components
+        video_loader = VideoLoader(frame_size=(224, 224), max_frames=100)
+        frame_normalizer = FrameNormaliser(dtype=np.float32)
+        video_preprocessor = VideoPreprocessor(
+            load_video_frames=video_loader.load_video_frames,
+            normalize_frames=frame_normalizer.normalize,
+            use_gpu=use_gpu,
+            max_workers=max_workers,
+            use_process_pool=use_process_pool
+        )
+        data_augmenter = DataAugmentation()
+        optical_flow_calculator = OpticalFlowCalculator()
+        sequence_aligner = SequenceAligner()
+        data_splitter = DataSplitter(test_size=test_size)
+
+        # Load video paths
+        video_paths = [os.path.join(video_dir, file) for file in os.listdir(video_dir) if file.endswith('.mp4')]
+        if not video_paths:
+            raise FileNotFoundError("No video files found in the specified directory.")
+
+        # Preprocess videos
+        logging.info("Starting video preprocessing...")
+        preprocessed_data = video_preprocessor.preprocess_in_parallel(video_paths)
+
+        if not preprocessed_data:
+            raise ValueError("No data was processed from the videos.")
+
+        # Augment data
+        logging.info("Starting data augmentation...")
+        augmented_data = [data_augmenter.augment(frames) for frames in preprocessed_data]
+
+        # Apply optical flow if needed
+        if apply_optical_flow:
+            logging.info("Calculating optical flow...")
+            optical_data = [optical_flow_calculator.calculate_optical_flow(frames) for frames in augmented_data]
+            data = optical_data
+        else:
+            data = augmented_data
+        
+        # Split data
+        logging.info("Splitting data into train and test sets...")
+        train_data, test_data = data_splitter.split_data(data)
+        if not train_data or not test_data:
+            raise ValueError("Training or testing data is empty after splitting.")
+
+        # Initialize and build models
+        logging.info("Building models...")
+        cnn_lstm_model = CNNLSTMModelBuilder(input_shape=(None, 224, 224, 3), num_classes=10).build_model()
+        transformer_model = TransformerBlock(input_shape=(None, 224, 224, 3), num_classes=10).build_model()
+
+        # Summary of models (for debugging purposes)
+        cnn_lstm_model.summary()
+        transformer_model.summary()
+
+        logging.info("Phase 1 completed successfully.")
+
+        # Here you would add the training code, e.g.:
+        # cnn_lstm_model.train(train_data)
+        # transformer_model.train(train_data)
+               
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        raise
 
 if __name__ == "__main__":
     main()

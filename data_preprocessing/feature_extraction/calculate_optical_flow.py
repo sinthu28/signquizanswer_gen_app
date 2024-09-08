@@ -2,15 +2,6 @@ import cv2
 import numpy as np
 
 def calculate_optical_flow(frames):
-    """
-    Calculate dense optical flow between consecutive frames.
-
-    Args:
-        frames (numpy array): Array of frames (in grayscale).
-
-    Returns:
-        optical_flows (numpy array): Optical flow data between consecutive frames.
-    """
     optical_flows = []
     prev_frame = cv2.cvtColor(frames[0], cv2.COLOR_BGR2GRAY)
 
@@ -21,3 +12,13 @@ def calculate_optical_flow(frames):
         prev_frame = next_frame
 
     return np.array(optical_flows)
+
+    """
+    Calculate dense optical flow between consecutive frames.
+
+    Args:
+        frames (numpy array): Array of frames (in grayscale).
+
+    Returns:
+        optical_flows (numpy array): Optical flow data between consecutive frames.
+    """

@@ -2,17 +2,6 @@ import concurrent.futures
 import os
 
 def preprocess_in_parallel(video_paths, load_video_frames, normalize_frames):
-    """
-    Preprocess multiple video files in parallel using concurrent processing.
-
-    Args:
-        video_paths (list): List of paths to video files.
-        load_video_frames (function): Function to load video frames.
-        normalize_frames (function): Function to normalize frames.
-
-    Returns:
-        all_preprocessed_data (list): List of preprocessed video frames.
-    """
     all_preprocessed_data = []
 
     def process_video(video_path):
