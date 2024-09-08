@@ -7,7 +7,7 @@ from Preprocess.SequenceAligner.SequenceAligner import SequenceAligner
 from Preprocess.Utils.DataSplitter import DataSplitter
 from Models.CNN import CNNLSTMModelBuilder
 from Models.Transformers import TransformerBlock
-from Gesture.GestureRecognizer import GestureRecognizer
+from Gesture.GestureRecogniser import GestureRecogniser
 
 import os
 import numpy as np
@@ -25,7 +25,7 @@ def main():
     
     video_loader = VideoLoader(frame_size=(224, 224), max_frames=100)
     frame_normalizer = FrameNormaliser(dtype=np.float32)
-    gesture_recognizer = GestureRecognizer()  # Initialize gesture recognizer
+    gesture_recognizer = GestureRecogniser()  # Initialize gesture recognizer
     video_preprocessor = VideoPreprocessor(
         load_video_frames=video_loader.load_video_frames,
         normalize_frames=frame_normalizer.normalize,
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
 
 ###########################################################################################
-#             Without Gesture Implementation Below                                                                            #
+#             Without Gesture Recogniser class implementation Below                                                                            #
 ###########################################################################################
 
 # import os
