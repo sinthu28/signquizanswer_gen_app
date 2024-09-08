@@ -1,12 +1,12 @@
-from data_preprocessing.load.VideoLoader import VideoLoader
-from data_preprocessing.normalization.FrameNormaliser import FrameNormaliser
-from data_preprocessing.parallel_processing.VideoPreprocessor import VideoPreprocessor
-from data_preprocessing.augmentation.DataAugmentation import DataAugmentation
-from data_preprocessing.feature_extraction.OpticalFlowCalculator import OpticalFlowCalculator
-from data_preprocessing.sequence_alignment.SequenceAligner import SequenceAligner
-from data_preprocessing.utils.DataSplitter import DataSplitter
-from models.CNN import CNNLSTMModelBuilder
-from models.Transformers import TransformerBlock
+from Preprocess.Load.VideoLoader import VideoLoader
+from Preprocess.Normalization.FrameNormaliser import FrameNormaliser
+from Preprocess.ParallelProcess.VideoPreprocessor import VideoPreprocessor
+from Preprocess.Augmentation.DataAugmentation import DataAugmentation
+from Preprocess.FeatureExtraction.OpticalFlowCalculator import OpticalFlowCalculator
+from Preprocess.SequenceAligner.SequenceAligner import SequenceAligner
+from Preprocess.Utils.DataSplitter import DataSplitter
+from Models.CNN import CNNLSTMModelBuilder
+from Models.Transformers import TransformerBlock
 
 import os
 import numpy as np
