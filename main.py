@@ -8,6 +8,7 @@ from Preprocess.Utils.DataSplitter import DataSplitter
 from Models.CNN import CNNLSTMModelBuilder
 from Models.Transformers import TransformerBlock
 from Gesture.GestureRecogniser import GestureRecogniser
+from QuestionUnderstanding.QuestionUnderstanding import QuestionUnderstanding
 
 import os
 import numpy as np
@@ -25,7 +26,7 @@ def main():
     
     video_loader = VideoLoader(frame_size=(224, 224), max_frames=100)
     frame_normalizer = FrameNormaliser(dtype=np.float32)
-    gesture_recognizer = GestureRecogniser()  # Initialize gesture recognizer
+    gesture_recognizer = GestureRecogniser()
     video_preprocessor = VideoPreprocessor(
         load_video_frames=video_loader.load_video_frames,
         normalize_frames=frame_normalizer.normalize,
@@ -37,6 +38,7 @@ def main():
     optical_flow_calculator = OpticalFlowCalculator()
     sequence_aligner = SequenceAligner()
     data_splitter = DataSplitter(test_size=test_size)
+    question_understanding = QuestionUnderstanding()  # Initialize question understanding model
 
     video_paths = [os.path.join(video_dir, file) for file in os.listdir(video_dir) if file.endswith('.mp4')]
     if not video_paths:
@@ -75,6 +77,12 @@ def main():
     cnn_lstm_model.summary()
     transformer_model.summary()
 
+    context = "Transformers are a type of model architecture that has achieved state-of-the-art results on various NLP tasks."
+    question = "What are transformers?"
+    answer = question_understanding.answer_question(question, context)
+    print(f"Question: {question}")
+    print(f"Answer: {answer}")
+
     logging.info("Phase 1 completed successfully.")
 
     # Here you would add the training code, e.g.:
@@ -84,9 +92,8 @@ def main():
 if __name__ == "__main__":
     main()
 
-
 ###########################################################################################
-#             Without Gesture Recogniser class implementation Below                                                                            #
+#             Without Gesture Recogniser class implementation Below                       #                                                    #
 ###########################################################################################
 
 # import os
