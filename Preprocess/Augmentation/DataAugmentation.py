@@ -38,22 +38,25 @@ class DataAugmentation:
                 angle = np.random.uniform(-15, 15)
                 center = (frame.shape[1] // 2, frame.shape[0] // 2)
                 matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-                rotated = cv2.warpAffine(frame, matrix, (frame.shape[1], frame.shape[0]))
-                augmented_frames.append(rotated)
+                frame = cv2.warpAffine(frame, matrix, (frame.shape[1], frame.shape[0]))
 
             if self.add_noise:
                 noise = np.random.normal(0, 0.1, frame.shape)
-                noisy_frame = frame + noise * 255
-                noisy_frame = np.clip(noisy_frame, 0, 255).astype(np.uint8)
-                augmented_frames.append(noisy_frame)
+                frame = frame + noise * 255
+                frame = np.clip(frame, 0, 255).astype(np.uint8)
 
             if self.zoom:
                 zoom_factor = np.random.uniform(1.0, 1.3)
                 h, w, _ = frame.shape
                 new_h, new_w = int(h / zoom_factor), int(w / zoom_factor)
                 top, left = (h - new_h) // 2, (w - new_w) // 2
-                zoomed_frame = frame[top:top + new_h, left:left + new_w]
-                zoomed_frame = cv2.resize(zoomed_frame, (w, h))
-                augmented_frames.append(zoomed_frame)
+                frame = frame[top:top + new_h, left:left + new_w]
+                frame = cv2.resize(frame, (w, h))
+
+            if self.brightness_adjust:
+                factor = np.random.uniform(0.7, 1.3)
+                frame = np.clip(frame * factor, 0, 255).astype(np.uint8)
+
+            augmented_frames.append(frame)
 
         return np.array(augmented_frames)

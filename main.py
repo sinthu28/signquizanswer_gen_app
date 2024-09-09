@@ -1,82 +1,77 @@
-from Preprocess.Load.VideoLoader import VideoLoader
-from Preprocess.Normalization.FrameNormaliser import FrameNormaliser
+import logging
+import sys
+import os
+import numpy as np
+import torch
+
+from Loader.WLASLDatasetLoader import WLASLDatasetLoader
+from Loader.VideoLoader import VideoLoader
+from Preprocess.Normaliser.FrameNormaliser import FrameNormaliser
 from Preprocess.ParallelProcess.VideoPreprocessor import VideoPreprocessor
 from Preprocess.Augmentation.DataAugmentation import DataAugmentation
-from Preprocess.FeatureExtraction.OpticalFlowCalculator import OpticalFlowCalculator
-from Preprocess.SequenceAligner.SequenceAligner import SequenceAligner
+from Preprocess.OpticalFlowCalculator.OpticalFlowCalculator import OpticalFlowCalculator
 from Preprocess.Utils.DataSplitter import DataSplitter
 from Models.CNN import CNNLSTMModelBuilder
 from Models.Transformers import TransformerBlock
-from Gesture.GestureRecogniser import GestureRecogniser
 from QuestionUnderstanding.QuestionUnderstanding import QuestionUnderstanding
-
-import os
-import numpy as np
-import logging
-import sys
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def main():
     try:
-        video_dir = 'path/to/video_directory'
+        metaData = '/Users/dxt/Desktop/beta_/data/WLASL_v0.3.json'
+        missingData = '/Users/dxt/Desktop/beta_/data/missing.txt'
+        videoDir = '/Users/dxt/Desktop/beta_/data/videos'
+        log_dir = '/Users/dxt/Desktop/beta_/logs'
+
         test_size = 0.2
-        use_gpu = True
+        use_gpu = torch.cuda.is_available()
         max_workers = 4
         use_process_pool = False
         apply_optical_flow = True
 
         video_loader = VideoLoader(frame_size=(224, 224), max_frames=100)
         frame_normalizer = FrameNormaliser(dtype=np.float32)
-        gesture_recognizer = GestureRecogniser()
+        wlasl_loader = WLASLDatasetLoader(metaData, missingData, videoDir, log_dir)
         video_preprocessor = VideoPreprocessor(
-            load_video_frames=video_loader.load_video_frames,
+            load_video_frames=video_loader.load_frames,
             normalize_frames=frame_normalizer.normalize,
             use_gpu=use_gpu,
             max_workers=max_workers,
-            use_process_pool=use_process_pool
+            use_process_pool=use_process_pool,
+            log_dir=log_dir
         )
         data_augmenter = DataAugmentation()
         optical_flow_calculator = OpticalFlowCalculator()
-        sequence_aligner = SequenceAligner()
         data_splitter = DataSplitter(test_size=test_size)
         question_understanding = QuestionUnderstanding()
 
-        video_paths = [os.path.join(video_dir, file) for file in os.listdir(video_dir) if file.endswith('.mp4')]
-        if not video_paths:
-            raise FileNotFoundError("No video files found in the specified directory.")
-        
-        logging.info(f"Found {len(video_paths)} videos. Starting video preprocessing...")
+        logging.info("Loading WLASL dataset...")
+        dataset = wlasl_loader.load_dataset()
+        stats = wlasl_loader.get_statistics()
+        logging.info(f"Dataset statistics: {stats}")
 
+        video_paths = [os.path.join(videoDir, f"{entry['instances']['video_id']}.mp4") for entry in dataset]
+
+        logging.info("Starting video preprocessing...")
         preprocessed_data = video_preprocessor.preprocess_in_parallel(video_paths)
+
         if not preprocessed_data:
             raise ValueError("No data was processed from the videos.")
         
         logging.info(f"Successfully preprocessed {len(preprocessed_data)} videos.")
 
-        logging.info("Extracting gestures and augmenting data...")
-        gesture_data = []
-        for frames in preprocessed_data:
-            try:
-                gestures = [gesture_recognizer.process_frame(frame) for frame in frames]
-                gesture_data.append(np.array(gestures))
-            except Exception as e:
-                logging.error(f"Error in gesture recognition: {e}")
-                continue
-
-        augmented_data = [data_augmenter.augment(frames) for frames in gesture_data]
+        logging.info("Augmenting data...")
+        augmented_data = [data_augmenter.augment(frames) for frames in preprocessed_data]
 
         if apply_optical_flow:
             logging.info("Calculating optical flow...")
-            optical_data = [optical_flow_calculator.calculate_optical_flow(frames) for frames in augmented_data]
-            data = optical_data
+            data = [optical_flow_calculator.calculate_optical_flow(frames) for frames in augmented_data]
         else:
             data = augmented_data
 
         logging.info(f"Data augmentation and optional optical flow completed on {len(data)} video sets.")
 
         logging.info("Splitting data into train and test sets...")
-        train_data, test_data = data_splitter.split_data(data)
+        train_data, test_data = data_splitter.split(data)
         if not train_data or not test_data:
             raise ValueError("Training or testing data is empty after splitting.")
         

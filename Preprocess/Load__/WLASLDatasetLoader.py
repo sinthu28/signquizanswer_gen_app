@@ -2,7 +2,7 @@ from collections.abc import Set
 import json
 import os
 from typing import List, Dict, Any
-from VideoLoader import VideoLoader
+from Preprocess.Load.VideoLoader import VideoLoader
 
 class WLASLDatasetLoader:
     def __init__(self, json_path: str, missing_file_path: str, video_dir: str):

@@ -1,6 +1,6 @@
-from fastdtw import fastdtw
-import numpy as np
 from scipy.spatial.distance import euclidean
+import numpy as np
+import fastdtw
 
 class SequenceAligner:
     def __init__(self, distance_metric=euclidean):
@@ -10,9 +10,19 @@ class SequenceAligner:
         if not (isinstance(sequence1, (list, np.ndarray)) and isinstance(sequence2, (list, np.ndarray))):
             raise ValueError("Both sequences must be lists or NumPy arrays.")
         
+        if np.ndim(sequence1) != np.ndim(sequence2):
+            raise ValueError("Both sequences must have the same number of dimensions.")
+
+        if len(sequence1) == 0 or len(sequence2) == 0:
+            raise ValueError("Sequences must not be empty.")
+
         try:
+            # Align using FastDTW
             distance, path = fastdtw(sequence1, sequence2, dist=self.distance_metric)
-            return distance, path
+            
+            # Warp sequence1 to match sequence2 based on the alignment path
+            aligned_sequence1 = [sequence1[i] for i, j in path]
+            return distance, aligned_sequence1, sequence2
         except Exception as e:
             raise RuntimeError(f"Error aligning sequences: {e}")
 

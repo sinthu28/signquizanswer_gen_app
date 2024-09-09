@@ -10,9 +10,13 @@ class FrameNormaliser:
         
         if frames.size == 0:
             raise ValueError("Input frames array is empty.")
+        
+        # Check 3D or 4D (For models the input could be a 4D)
+        if frames.ndim not in [3, 4]:
+            raise ValueError("Input frames must be 3D (single video) or 4D (batch of videos).")
 
         normalized_frames = frames.astype(self.dtype) / 255.0
-
+        
         return normalized_frames
 
 

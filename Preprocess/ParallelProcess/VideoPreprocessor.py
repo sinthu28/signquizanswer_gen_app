@@ -1,66 +1,75 @@
 import concurrent.futures
-import os
 import logging
-import torch  # Assuming PyTorch for GPU usage
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+import torch
+import os
+from datetime import datetime
+import numpy as np
 
 class VideoPreprocessor:
-    def __init__(self, load_video_frames, normalize_frames, use_gpu=True, max_workers=None, use_process_pool=False):
-        self.load_video_frames = load_video_frames
-        self.normalize_frames = normalize_frames
-        self.use_gpu = use_gpu
+    def __init__(self, normalizer, augmenter, optical_flow_calculator, sequence_aligner, use_gpu=True, max_workers=4, log_dir='logs'):
+        self.normalizer = normalizer
+        self.augmenter = augmenter
+        self.optical_flow_calculator = optical_flow_calculator
+        self.sequence_aligner = sequence_aligner
+        self.use_gpu = use_gpu and torch.cuda.is_available()
         self.max_workers = max_workers
-        self.use_process_pool = use_process_pool
+        self.log_dir = log_dir
 
-    def is_gpu_available(self):
-        return torch.cuda.is_available()
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        self.setup_logging()
 
-    def preprocess_video(self, video_path):
+    def setup_logging(self):
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        log_filename = f"VideoPreprocessor_{current_date}.log"
+        log_path = os.path.join(self.log_dir, log_filename)
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        file_handler = logging.FileHandler(log_path)
+        console_handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
+
+    def preprocess_video(self, frames):
         try:
-            logging.info(f"Processing video: {video_path}")
+            self.logger.info("Starting normalization")
+            normalized_frames = self.normalizer.normalize(frames)
             
-            frames = self.load_video_frames(video_path)
-            
-            if frames is None:
-                raise ValueError(f"Failed to load frames from {video_path}")
-            
-            if self.use_gpu and self.is_gpu_available():
-                logging.info(f"Using GPU for video processing: {video_path}")
-                frames = torch.tensor(frames).to('cuda')
-            
-            frames = self.normalize_frames(frames)
-            
-            if self.use_gpu and self.is_gpu_available():
-                frames = frames.cpu().numpy()
-            
-            return frames
+            self.logger.info("Starting augmentation")
+            augmented_frames = self.augmenter.augment(normalized_frames)
+
+            self.logger.info("Starting optical flow calculation")
+            optical_flows = self.optical_flow_calculator.calculate(augmented_frames)
+
+            self.logger.info("Sequence alignment (optional)")
+            # Perform sequence alignment here if required
+            aligned_sequence = self.sequence_aligner.align(optical_flows, optical_flows) # Dummy alignment
+
+            return aligned_sequence
         except Exception as e:
-            logging.error(f"Error processing video {video_path}: {e}")
+            self.logger.error(f"Error processing video: {e}")
             return None
 
-    def preprocess_in_parallel(self, video_paths):
+    def preprocess_in_parallel(self, video_paths, load_video_frames):
         all_preprocessed_data = []
-
-        Executor = concurrent.futures.ProcessPoolExecutor if self.use_process_pool else concurrent.futures.ThreadPoolExecutor
-
-        with Executor(max_workers=self.max_workers) as executor:
-            futures = [executor.submit(self.preprocess_video, video_path) for video_path in video_paths]
-            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = [executor.submit(self.preprocess_video, load_video_frames(path)) for path in video_paths]
             for future in concurrent.futures.as_completed(futures):
                 try:
                     result = future.result()
                     if result is not None:
                         all_preprocessed_data.append(result)
                 except Exception as e:
-                    logging.error(f"Exception during video processing: {e}")
-        
-        logging.info(f"Successfully processed {len(all_preprocessed_data)} out of {len(video_paths)} videos.")
-        return all_preprocessed_data
-    
+                    self.logger.error(f"Exception during video processing: {e}")
 
-    """
-        # Define your video loading and normalization functions
+        self.logger.info(f"Successfully processed {len(all_preprocessed_data)} out of {len(video_paths)} videos.")
+        return all_preprocessed_data
+
+# Usage example:
+"""
         def load_video_frames(video_path):
             # Implementation here...
             pass
@@ -69,7 +78,6 @@ class VideoPreprocessor:
             # Implementation here...
             pass
 
-        # Create an instance of VideoPreprocessor
         preprocessor = VideoPreprocessor(
             load_video_frames=load_video_frames,
             normalize_frames=normalize_frames,
@@ -78,9 +86,6 @@ class VideoPreprocessor:
             use_process_pool=False
         )
 
-        # List of video file paths
         video_paths = ['path/to/video1.mp4', 'path/to/video2.mp4']
-
-        # Process videos
         processed_frames = preprocessor.preprocess_in_parallel(video_paths)
-    """
+"""
