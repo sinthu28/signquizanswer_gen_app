@@ -2,13 +2,34 @@ import cv2
 import numpy as np
 import logging
 import os
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class VideoLoader:
-    def __init__(self, frame_size=(224, 224), max_frames=None):
+    def __init__(self, frame_size=(224, 224), max_frames=None, log_dir='logs'):
         self.frame_size = frame_size
         self.max_frames = max_frames
+        self.log_dir = log_dir
+
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        self.setup_logging()
+
+    def setup_logging(self):
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        log_filename = f"video_loader_{current_date}.log"
+        log_path = os.path.join(self.log_dir, log_filename)
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_path),
+                logging.StreamHandler()
+            ]
+        )
 
     def load_frames(self, video_path):
         if not os.path.exists(video_path):
