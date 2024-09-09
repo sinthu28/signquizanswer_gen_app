@@ -3,9 +3,10 @@ import logging
 import torch
 import os
 from datetime import datetime
+import numpy as np
 
 class VideoPreprocessor:
-    def __init__(self, normalizer, augmenter, optical_flow_calculator, sequence_aligner, use_gpu=True, max_workers=4, log_dir='logs'):
+    def __init__(self, normalizer, augmenter, optical_flow_calculator, sequence_aligner, use_gpu=True, max_workers=2, log_dir='logs'):
         self.normalizer = normalizer
         self.augmenter = augmenter
         self.optical_flow_calculator = optical_flow_calculator
@@ -13,6 +14,9 @@ class VideoPreprocessor:
         self.use_gpu = use_gpu and torch.cuda.is_available()
         self.max_workers = max_workers
         self.log_dir = log_dir
+
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
         self.setup_logging()
 
     def setup_logging(self):
@@ -23,7 +27,7 @@ class VideoPreprocessor:
         self.logger.setLevel(logging.INFO)
         file_handler = logging.FileHandler(log_path)
         console_handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
@@ -31,6 +35,7 @@ class VideoPreprocessor:
 
     def preprocess_video(self, frames):
         try:
+            self.logger.info(f"Processing {len(frames)} frames.")
             self.logger.info("Starting normalization")
             normalized_frames = self.normalizer.normalize(frames)
             
@@ -40,12 +45,12 @@ class VideoPreprocessor:
             self.logger.info("Starting optical flow calculation")
             optical_flows = self.optical_flow_calculator.calculate(augmented_frames)
 
-            self.logger.info("Sequence alignment")
+            self.logger.info("Sequence alignment (optional)")
             aligned_sequence = self.sequence_aligner.align(optical_flows, optical_flows) # Dummy alignment
 
             return aligned_sequence
         except Exception as e:
-            self.logger.error(f"Error processing video: {e}", exc_info=True)
+            self.logger.error(f"Error processing video: {e}")
             return None
 
     def preprocess_in_parallel(self, video_paths, load_video_frames):
@@ -58,7 +63,7 @@ class VideoPreprocessor:
                     if result is not None:
                         all_preprocessed_data.append(result)
                 except Exception as e:
-                    self.logger.error(f"Exception during video processing: {e}", exc_info=True)
+                    self.logger.error(f"Exception during video processing: {e}")
 
         self.logger.info(f"Successfully processed {len(all_preprocessed_data)} out of {len(video_paths)} videos.")
         return all_preprocessed_data
