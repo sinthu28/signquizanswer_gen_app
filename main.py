@@ -1,193 +1,78 @@
-import logging
-import sys
 import os
-import numpy as np
-import torch
-
 from Loader.WLASLDatasetLoader import WLASLDatasetLoader
-from Loader.VideoLoader import VideoLoader
-from Preprocess.Normaliser.FrameNormaliser import FrameNormaliser
-from Preprocess.ParallelProcess.VideoPreprocessor import VideoPreprocessor
-from Preprocess.Augmentation.DataAugmentation import DataAugmentation
-from Preprocess.OpticalFlowCalculator.OpticalFlowCalculator import OpticalFlowCalculator
-from Preprocess.Utils.DataSplitter import DataSplitter
-from Models.CNN import CNNLSTMModelBuilder
-from Models.Transformers import TransformerBlock
-from QuestionUnderstanding.QuestionUnderstanding import QuestionUnderstanding
+from Loader.DataSplitter import DataSplitter
+from Preprocess.Normaliser import FrameNormaliser
+from Preprocess.Augmentation import DataAugmentation
+from Preprocess.OpticalFlow import OpticalFlowCalculator
+from Preprocess.SequenceAligner import HierarchicalMethod
+from Preprocess.ParallelProcess import VideoPreprocessor
 
 def main():
-    try:
-        metaData = '/Users/dxt/Desktop/beta_/data/WLASL_v0.3.json'
-        missingData = '/Users/dxt/Desktop/beta_/data/missing.txt'
-        videoDir = '/Users/dxt/Desktop/beta_/data/videos'
-        log_dir = '/Users/dxt/Desktop/beta_/logs'
+    json_path = '/Users/dxt/Desktop/beta_/data/WLASL_v0.3.json'
+    missing_file_path = '/Users/dxt/Desktop/beta_/data/missing.txt'
+    video_dir = '/Users/dxt/Desktop/beta_/data/videos'
+    
+    dataset_loader = WLASLDatasetLoader(json_path, missing_file_path, video_dir)
 
-        test_size = 0.2
-        use_gpu = torch.cuda.is_available()
-        max_workers = 4
-        use_process_pool = False
-        apply_optical_flow = True
+    dataset = dataset_loader.load_dataset()
+    print("Dataset loaded : WLASLDatasetLoader Task done !!")
+    # stats = dataset_loader.get_statistics()
+    # print(f"Dataset Statistics: {stats}")
 
-        video_loader = VideoLoader(frame_size=(224, 224), max_frames=100)
-        frame_normalizer = FrameNormaliser(dtype=np.float32)
-        wlasl_loader = WLASLDatasetLoader(metaData, missingData, videoDir, log_dir)
-        video_preprocessor = VideoPreprocessor(
-            load_video_frames=video_loader.load_frames,
-            normalize_frames=frame_normalizer.normalize,
-            use_gpu=use_gpu,
-            max_workers=max_workers,
-            use_process_pool=use_process_pool,
-            log_dir=log_dir
-        )
-        data_augmenter = DataAugmentation()
-        optical_flow_calculator = OpticalFlowCalculator()
-        data_splitter = DataSplitter(test_size=test_size)
-        question_understanding = QuestionUnderstanding()
+    normalizer = FrameNormaliser()  # Specify normalization method if needed
+    augmenter = DataAugmentation()  # Configure augmentations if needed
+    optical_flow_calculator = OpticalFlowCalculator()  # Configure as needed
+    sequence_aligner = HierarchicalMethod()  # Configure alignment if needed
+    video_preprocessor = VideoPreprocessor(
+        normalizer=normalizer,
+        augmenter=augmenter,
+        optical_flow_calculator=optical_flow_calculator,
+        sequence_aligner=sequence_aligner,
+        use_gpu=True,
+        max_workers=4,
+        log_dir='logs'
+    )
 
-        logging.info("Loading WLASL dataset...")
-        dataset = wlasl_loader.load_dataset()
-        stats = wlasl_loader.get_statistics()
-        logging.info(f"Dataset statistics: {stats}")
+    print("Preprocessing parallel started.....")
 
-        video_paths = [os.path.join(videoDir, f"{entry['instances']['video_id']}.mp4") for entry in dataset]
+    processed_data = video_preprocessor.preprocess_in_parallel(
+        video_paths=[os.path.join(video_dir, f"{instance['video_id']}.mp4") for instance in dataset],
+        load_video_frames=dataset_loader._load_frames_for_instance  # Pass the frame loading function
+    )
 
-        logging.info("Starting video preprocessing...")
-        preprocessed_data = video_preprocessor.preprocess_in_parallel(video_paths)
+    print("Preprocessing completed : VideoPreprocessor Task done !!")
+    
+    print("Data Splitting..")
+    data_splitter = DataSplitter()
+    training_data, testing_data = data_splitter.split(processed_data)
 
-        if not preprocessed_data:
-            raise ValueError("No data was processed from the videos.")
-        
-        logging.info(f"Successfully preprocessed {len(preprocessed_data)} videos.")
-
-        logging.info("Augmenting data...")
-        augmented_data = [data_augmenter.augment(frames) for frames in preprocessed_data]
-
-        if apply_optical_flow:
-            logging.info("Calculating optical flow...")
-            data = [optical_flow_calculator.calculate_optical_flow(frames) for frames in augmented_data]
-        else:
-            data = augmented_data
-
-        logging.info(f"Data augmentation and optional optical flow completed on {len(data)} video sets.")
-
-        logging.info("Splitting data into train and test sets...")
-        train_data, test_data = data_splitter.split(data)
-        if not train_data or not test_data:
-            raise ValueError("Training or testing data is empty after splitting.")
-        
-        logging.info(f"Training set: {len(train_data)}, Test set: {len(test_data)}")
-
-        logging.info("Building models...")
-        cnn_lstm_model = CNNLSTMModelBuilder(input_shape=(None, 224, 224, 3), num_classes=10).build_model()
-        transformer_model = TransformerBlock(input_shape=(None, 224, 224, 3), num_classes=10).build_model()
-
-        logging.info("CNN-LSTM Model Summary:")
-        cnn_lstm_model.summary()
-
-        logging.info("Transformer Model Summary:")
-        transformer_model.summary()
-
-        context = "Transformers are a type of model architecture that has achieved state-of-the-art results on various NLP tasks."
-        question = "What are transformers?"
-        answer = question_understanding.answer_question(question, context)
-        logging.info(f"Question: {question}")
-        logging.info(f"Answer: {answer}")
-
-        logging.info("Phase 1 completed successfully.")
-
-        # Here you would add the training code:
-        # cnn_lstm_model.train(train_data)
-        # transformer_model.train(train_data)
-
-    except Exception as e:
-        logging.error(f"An error occurred during execution: {e}")
-        sys.exit(1)
+    print(f"Processed Data Split: {len(training_data)} training samples, {len(testing_data)} testing samples.")
 
 if __name__ == "__main__":
     main()
 
-###########################################################################################
-#             Without Gesture Recogniser class implementation Below                       #                                                    #
-###########################################################################################
 
-# import os
-# import numpy as np
-# import logging
+## <---------------------- 1 ----------------------> ##
 
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# from Loader.WLASLDatasetLoader import WLASLDatasetLoader
 
 # def main():
-#     video_dir = 'path/to/video_directory'
-#     test_size = 0.2
-#     use_gpu = True
-#     max_workers = 4
-#     use_process_pool = False
-#     apply_optical_flow = True
+    # json_path = '/Users/dxt/Desktop/beta_/data/WLASL_v0.3.json'
+    # missing_file_path = '/Users/dxt/Desktop/beta_/data/missing.txt'
+    # video_dir = '/Users/dxt/Desktop/beta_/data/videos'
 
-#     try:
-#         # Initialize components
-#         video_loader = VideoLoader(frame_size=(224, 224), max_frames=100)
-#         frame_normalizer = FrameNormaliser(dtype=np.float32)
-#         video_preprocessor = VideoPreprocessor(
-#             load_video_frames=video_loader.load_video_frames,
-#             normalize_frames=frame_normalizer.normalize,
-#             use_gpu=use_gpu,
-#             max_workers=max_workers,
-#             use_process_pool=use_process_pool
-#         )
-#         data_augmenter = DataAugmentation()
-#         optical_flow_calculator = OpticalFlowCalculator()
-#         sequence_aligner = SequenceAligner()
-#         data_splitter = DataSplitter(test_size=test_size)
+#     dataset_loader = WLASLDatasetLoader(
+#         json_path=json_path,
+#         missing_file_path=missing_file_path,
+#         video_dir=video_dir,
+#         max_workers=4  
+#     )
 
-#         # Load video paths
-#         video_paths = [os.path.join(video_dir, file) for file in os.listdir(video_dir) if file.endswith('.mp4')]
-#         if not video_paths:
-#             raise FileNotFoundError("No video files found in the specified directory.")
+#     dataset = dataset_loader.load_dataset()
+#     print(f"Loaded {len(dataset)} video entries.")
 
-#         # Preprocess videos
-#         logging.info("Starting video preprocessing...")
-#         preprocessed_data = video_preprocessor.preprocess_in_parallel(video_paths)
-
-#         if not preprocessed_data:
-#             raise ValueError("No data was processed from the videos.")
-
-#         # Augment data
-#         logging.info("Starting data augmentation...")
-#         augmented_data = [data_augmenter.augment(frames) for frames in preprocessed_data]
-
-#         # Apply optical flow if needed
-#         if apply_optical_flow:
-#             logging.info("Calculating optical flow...")
-#             optical_data = [optical_flow_calculator.calculate_optical_flow(frames) for frames in augmented_data]
-#             data = optical_data
-#         else:
-#             data = augmented_data
-        
-#         # Split data
-#         logging.info("Splitting data into train and test sets...")
-#         train_data, test_data = data_splitter.split_data(data)
-#         if not train_data or not test_data:
-#             raise ValueError("Training or testing data is empty after splitting.")
-
-#         # Initialize and build models
-#         logging.info("Building models...")
-#         cnn_lstm_model = CNNLSTMModelBuilder(input_shape=(None, 224, 224, 3), num_classes=10).build_model()
-#         transformer_model = TransformerBlock(input_shape=(None, 224, 224, 3), num_classes=10).build_model()
-
-#         # Summary of models (for debugging purposes)
-#         cnn_lstm_model.summary()
-#         transformer_model.summary()
-
-#         logging.info("Phase 1 completed successfully.")
-
-#         # Here you would add the training code, e.g.:
-#         # cnn_lstm_model.train(train_data)
-#         # transformer_model.train(train_data)
-               
-#     except Exception as e:
-#         logging.error(f"An error occurred: {e}")
-#         raise
+#     stats = dataset_loader.get_statistics()
+#     print(f"Statistics: {stats}")
 
 # if __name__ == "__main__":
 #     main()

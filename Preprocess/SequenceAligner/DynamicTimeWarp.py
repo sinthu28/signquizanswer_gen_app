@@ -1,10 +1,11 @@
-from scipy.spatial.distance import euclidean
 import numpy as np
 import fastdtw
+from scipy.spatial.distance import euclidean
 
 class SequenceAligner:
-    def __init__(self, distance_metric=euclidean):
+    def __init__(self, distance_metric=euclidean, radius=10):
         self.distance_metric = distance_metric
+        self.radius = radius
 
     def align(self, sequence1, sequence2):
         if not (isinstance(sequence1, (list, np.ndarray)) and isinstance(sequence2, (list, np.ndarray))):
@@ -17,25 +18,9 @@ class SequenceAligner:
             raise ValueError("Sequences must not be empty.")
 
         try:
-            # Align using FastDTW
-            distance, path = fastdtw(sequence1, sequence2, dist=self.distance_metric)
-            
-            # Warp sequence1 to match sequence2 based on the alignment path
+            # Constrain the warping path
+            distance, path = fastdtw(sequence1, sequence2, dist=self.distance_metric, radius=self.radius)
             aligned_sequence1 = [sequence1[i] for i, j in path]
             return distance, aligned_sequence1, sequence2
         except Exception as e:
             raise RuntimeError(f"Error aligning sequences: {e}")
-
-"""
-        if __name__ == "__main__":
-            sequence1 = [1, 2, 3, 4, 5]
-            sequence2 = [2, 3, 4, 5, 6]
-
-            aligner = SequenceAligner()
-
-            distance, path = aligner.align(sequence1, sequence2)
-
-            print(f"Distance: {distance}")
-            print(f"Path: {path}")
-    
-"""

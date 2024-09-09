@@ -1,4 +1,4 @@
-from fastdtw import fastdtw
+import fastdtw
 from scipy.spatial.distance import euclidean
 
 def align_sequences(sequence1, sequence2):

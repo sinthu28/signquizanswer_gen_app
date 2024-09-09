@@ -3,7 +3,6 @@ import logging
 import torch
 import os
 from datetime import datetime
-import numpy as np
 
 class VideoPreprocessor:
     def __init__(self, normalizer, augmenter, optical_flow_calculator, sequence_aligner, use_gpu=True, max_workers=4, log_dir='logs'):
@@ -14,9 +13,6 @@ class VideoPreprocessor:
         self.use_gpu = use_gpu and torch.cuda.is_available()
         self.max_workers = max_workers
         self.log_dir = log_dir
-
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
         self.setup_logging()
 
     def setup_logging(self):
@@ -27,7 +23,7 @@ class VideoPreprocessor:
         self.logger.setLevel(logging.INFO)
         file_handler = logging.FileHandler(log_path)
         console_handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
@@ -44,13 +40,12 @@ class VideoPreprocessor:
             self.logger.info("Starting optical flow calculation")
             optical_flows = self.optical_flow_calculator.calculate(augmented_frames)
 
-            self.logger.info("Sequence alignment (optional)")
-            # Perform sequence alignment here if required
+            self.logger.info("Sequence alignment")
             aligned_sequence = self.sequence_aligner.align(optical_flows, optical_flows) # Dummy alignment
 
             return aligned_sequence
         except Exception as e:
-            self.logger.error(f"Error processing video: {e}")
+            self.logger.error(f"Error processing video: {e}", exc_info=True)
             return None
 
     def preprocess_in_parallel(self, video_paths, load_video_frames):
@@ -63,29 +58,7 @@ class VideoPreprocessor:
                     if result is not None:
                         all_preprocessed_data.append(result)
                 except Exception as e:
-                    self.logger.error(f"Exception during video processing: {e}")
+                    self.logger.error(f"Exception during video processing: {e}", exc_info=True)
 
         self.logger.info(f"Successfully processed {len(all_preprocessed_data)} out of {len(video_paths)} videos.")
         return all_preprocessed_data
-
-# Usage example:
-"""
-        def load_video_frames(video_path):
-            # Implementation here...
-            pass
-
-        def normalize_frames(frames):
-            # Implementation here...
-            pass
-
-        preprocessor = VideoPreprocessor(
-            load_video_frames=load_video_frames,
-            normalize_frames=normalize_frames,
-            use_gpu=True,
-            max_workers=4,
-            use_process_pool=False
-        )
-
-        video_paths = ['path/to/video1.mp4', 'path/to/video2.mp4']
-        processed_frames = preprocessor.preprocess_in_parallel(video_paths)
-"""

@@ -4,8 +4,6 @@ import logging
 import os
 from datetime import datetime
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 class VideoLoader:
     def __init__(self, frame_size=(224, 224), max_frames=None, log_dir='logs'):
         self.frame_size = frame_size
@@ -19,15 +17,14 @@ class VideoLoader:
 
     def setup_logging(self):
         current_date = datetime.now().strftime("%Y-%m-%d")
-        log_filename = f"video_loader_{current_date}.log"
+        log_filename = f"VideoLoader_{current_date}.log"
         log_path = os.path.join(self.log_dir, log_filename)
 
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(log_path),
-                logging.StreamHandler()
+                logging.FileHandler(log_path)
             ]
         )
 
@@ -75,14 +72,3 @@ class VideoLoader:
 
         logging.info(f"Successfully loaded {len(frames)} frames from {video_path}")
         return np.array(frames)
-
-
-
-    """
-        # Create an instance of VideoLoader
-        video_loader = VideoLoader(frame_size=(224, 224), max_frames=100)
-
-        # Load frames from a video file
-        frames = video_loader.load_frames('path/to/video.mp4')
-    """
-
