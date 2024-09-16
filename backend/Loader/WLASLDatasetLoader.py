@@ -1,12 +1,12 @@
-from collections.abc import Set
 import json
-import os
 from typing import List, Dict, Any
+from collections.abc import Set
+import os
 from Loader.VideoLoader import VideoLoader
 import concurrent.futures
 
 class WLASLDatasetLoader:
-    def __init__(self, json_path: str, missing_file_path: str, video_dir: str, max_workers: int = 4, batch_size: int = 10, log_dir = 'logs'):
+    def __init__(self, json_path: str, missing_file_path: str, video_dir: str, log_dir = 'logs', max_workers: int = 4, batch_size: int = 10):
         self.json_path = json_path
         self.missing_file_path = missing_file_path
         self.video_dir = video_dir
@@ -89,3 +89,20 @@ class WLASLDatasetLoader:
             'loaded_videos': loaded_videos,
             'missing_videos': missing_videos
         }
+
+
+#     def load_metadata_json(self):   
+#         json_path = '/Users/dxt/Desktop/beta_/data/WLASL_v0.3.json'
+#         with open(json_path, 'r') as metadata:
+#             return json.load(metadata)
+    
+#     def prepare_dataset(self):
+#         for entry in self.load_metadata_json:
+#             for instance in entry['instances']:
+#                 print(type(instance))
+#         # pass
+
+
+
+# test = WLASLDatasetLoader()
+# test.prepare_dataset()
